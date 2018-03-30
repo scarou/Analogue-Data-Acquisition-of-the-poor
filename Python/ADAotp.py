@@ -1,9 +1,4 @@
 # -*- coding: UTF-8 -*-
-
-##La grosse modif bidon
-
-## Et sa copine tout aussi bidon....
-
 import random # Used for create_plots function (test purpose)
 
 import serial
@@ -39,15 +34,12 @@ portCOM = 'com14'
 baudRate = 115200
 sampleSize = 50
 
-# --- INFO : The menu item "Serial port/ Open serial COM..." is actually not working
-# The command associated to this menu item is the openSerialPort(portCom, baudRate)
-# defined few lines under. But as said... not working actually. So the serial communication
-# is opened with default values with the line hereunder
 arduinoData = serial.Serial()    #Creating our serial object named arduinoData
 # ---
 
-dataFileName = 'Data_logger.csv'
+dataFileName = 'Data_log.csv'
 saveData = False
+saveInitalData = False
 
 
 f = Figure()
@@ -84,47 +76,59 @@ def create_plots(plotNumber, amplitude): # create random x, y values ; need rand
 
 
 def choosePort(): # Allow the user to choose the serial port for serial communication
-    portComQ =tk.Tk()
-    portComQ.wm_title('Serial port?')
-    label = ttk.Label(portComQ, text = "Choose the serial port to listen.")
-    label.pack(side="top", fill="x", pady=10)
+    
+    if arduinoData.isOpen() == True:
+        print (arduinoData.isOpen())
+        popupmsg('Serial port {} already opened. Close connection prior to change port.'.format(portCOM))
 
-    e = ttk.Entry(portComQ)
-    e.insert(0,portCOM[3:]) # Getting the port number from the String
-    e.pack()
-    e.focus_set()
-
-    def callback():
-        global portCOM
-        portCOM = 'com' + str(e.get())
-        print('Port {} is now selected.'.format(portCOM))
-        portComQ.destroy()
+    else:
+        portComQ =tk.Tk()
+        portComQ.wm_title('Serial port?')
+        label = ttk.Label(portComQ, text = "Choose the serial port to listen.")
+        label.pack(side="top", fill="x", pady=10)
         
-    b = ttk.Button(portComQ, text='Submit', width=10, command=callback)
-    b.pack()
-    tk.mainloop()
+
+        e = ttk.Entry(portComQ)
+        e.insert(0,portCOM[3:]) # Getting the port number from the String
+        e.pack()
+        e.focus_set()
+
+        def callback():
+            global portCOM
+            portCOM = 'com' + str(e.get())
+            print('Port {} is now selected.'.format(portCOM))
+            portComQ.destroy()
+            
+        b = ttk.Button(portComQ, text='Submit', width=10, command=callback)
+        b.pack()
+        tk.mainloop()
     
 
 def chooseBaudRate(): # Allow the user to choose the baud rate of the serial communication
-    baudRateQ =tk.Tk()
-    baudRateQ.wm_title('Baud rate?')
-    label = ttk.Label(baudRateQ, text = "Specify the baud rate value.")
-    label.pack(side="top", fill="x", pady=10)
+    if arduinoData.isOpen() == True:
+        print (arduinoData.isOpen())
+        popupmsg('Serial port {} already opened at {} baud. Close connection prior to change baud rate.'.format(portCOM,baudRate))
 
-    e = ttk.Entry(baudRateQ)
-    e.insert(0,baudRate)
-    e.pack()
-    e.focus_set()
+    else:
+        baudRateQ =tk.Tk()
+        baudRateQ.wm_title('Baud rate?')
+        label = ttk.Label(baudRateQ, text = "Specify the baud rate value.")
+        label.pack(side="top", fill="x", pady=10)
 
-    def callback():
-        global baudRate
-        baudRate = e.get()
-        print('{} baudrate is now selected'.format(baudRate))
-        baudRateQ.destroy()
-        
-    b = ttk.Button(baudRateQ, text='Submit', width=10, command=callback)
-    b.pack()
-    tk.mainloop()
+        e = ttk.Entry(baudRateQ)
+        e.insert(0,baudRate)
+        e.pack()
+        e.focus_set()
+
+        def callback():
+            global baudRate
+            baudRate = e.get()
+            print('{} baudrate is now selected'.format(baudRate))
+            baudRateQ.destroy()
+            
+        b = ttk.Button(baudRateQ, text='Submit', width=10, command=callback)
+        b.pack()
+        tk.mainloop()
 
 
 def chooseSampleSize(): # Allow the user to choose the sample size of displayed values
@@ -155,17 +159,18 @@ def chooseSampleSize(): # Allow the user to choose the sample size of displayed 
 # --- Now working !!! ---
 def openSerialPort(portCom, baudRate, openState): # Should open a serial communication with the portCom and baudRate defined
     global arduinoData
-    arduinoData.port = portCOM
-    arduinoData.baudrate = baudRate
+    
+
     if openState == True:
         if arduinoData.isOpen() == False:
+            arduinoData.port = portCOM
+            arduinoData.baudrate = baudRate
+##            arduinoData.timeout = 1
             try:
                 arduinoData.open()
                 print('Port {} is now opened'.format(arduinoData.port))
             except:
-                msg = 'Unable to open serial port {}. Please check connection.'.format(arduinoData.port)
-                print(msg)
-                popupmsg(msg)
+                popupmsg('Unable to open serial port {}. Please check connection.'.format(arduinoData.port))
                 
     elif openState == False:
         if arduinoData.isOpen() == True:
@@ -173,13 +178,9 @@ def openSerialPort(portCom, baudRate, openState): # Should open a serial communi
                 arduinoData.close()
                 print('Port {} is now closed'.format(arduinoData.port))
             except:
-                msg = 'Unable to close serial port {}. Please check connection.'.format(arduinoData.port)
-                print(msg)
-                popupmsg(msg)
+                popupmsg('Unable to close serial port {}. Please check connection.'.format(arduinoData.port))
         else:
-            msg = 'Serial port {} already closed.'.format(arduinoData.port)
-            print(msg)
-            popupmsg(msg)
+            popupmsg('Serial port {} already closed.'.format(arduinoData.port))
             
 # -----------------------    
 
@@ -190,26 +191,25 @@ def saveDataAsCSV(state): # Create a new csv file for saving data.
     global saveData
     if arduinoData.isOpen() == True:
         
-        if state == True : # Create the file name.
+        if state == True and saveData == False: # Create the file name.
             print("START recording data...")
             dataFileName = 'Data_log_ {date:%Y-%m-%d_%H-%M-%S}.csv'.format( date=datetime.datetime.now() )
             saveData = True
             print(dataFileName)
             
-        elif state == False : # Close the csv file and rename it with the actual time code format.
+        elif state == False and saveData == True: # Close the csv file and rename it with the actual time code format.
             saveData = False
             dataFileNameClosed = 'Data_log_ {date:%Y-%m-%d_%H-%M-%S}.csv'.format( date=datetime.datetime.now() )
             os.rename(dataFileName, dataFileNameClosed)
             print("STOP recording data and saving record as csv file.")
             print(dataFileNameClosed)
     else:
-        msg = 'Serial port {} is closed. No data to record!'.format(arduinoData.port)
-        print(msg)
-        popupmsg(msg)
+        popupmsg('No serial port opened. No data to record!')
 
         
 
 def popupmsg(msg): # Popup the given message "msg"
+    print(msg)
     popup = tk.Tk()
 
     popup.wm_title("!")
@@ -265,7 +265,10 @@ def animate(i): # This function create graph, read data from serial port and upd
         d.set_ylim(0,100)
         d.set_ylabel ('Pressure (KPa)')
 
-        if(len(T1_Arr)>sampleSize):     # If you have "sampleSize" or more points, delete the first one from the array            
+        
+        
+        while(len(T1_Arr)>sampleSize):     # If you have "sampleSize" or more points, delete the first one from the array
+            
             T1_Arr.pop(0)       # This allows us to just see the last "sampleSize" data points
             I1_Arr.pop(0)       # Have to be improved later by selecting the number of points in a menu
             H1_Arr.pop(0)
@@ -273,12 +276,27 @@ def animate(i): # This function create graph, read data from serial port and upd
 
         
         if saveData ==True: # --- Saving data as csv file --- (see saveDataAsCSV)
+            global saveInitalData
             myFile = open(dataFileName,'ab')
-            try:
-                theWriter = csv.writer(myFile, dialect='excel')  
-                theWriter.writerow([T1,I1,H1,P1])
-            finally:
-                myFile.close()
+            
+            if saveInitalData == False:
+                try:
+                    theWriter = csv.writer(myFile, dialect='excel')
+                    i = 0
+                    while  i < len(T1_Arr):
+##                        print(T1_Arr[i],I1_Arr[i],H1_Arr[i],P1_Arr[i])
+                        theWriter.writerow([T1_Arr[i],I1_Arr[i],H1_Arr[i],P1_Arr[i]])
+                        i += 1
+                finally:
+                    
+                    myFile.close()
+                    saveInitalData = True
+            else:
+                try:
+                    theWriter = csv.writer(myFile, dialect='excel')  
+                    theWriter.writerow([T1,I1,H1,P1])
+                finally:
+                    myFile.close()
 
 
 class DataLogApp(tk.Tk): # Design of the main application and menubar
@@ -338,7 +356,7 @@ class DataLogApp(tk.Tk): # Design of the main application and menubar
 
         self.frames = {}
 
-        for F in (StartPage, PageOne, graph_Page):
+        for F in (StartPage, graph_Page):
 
             frame = F(container, self)
 
@@ -374,10 +392,11 @@ class StartPage(tk.Frame): # Start page ...
                             text="Disagree",
                             command=quit)
         button2.pack()
-        
 
 
-class PageOne(tk.Frame):
+
+
+class graph_Page(tk.Frame): # Page of the monitoring graph
 
     def __init__(self, parent, controller):
         tk.Frame.__init__(self,parent)
@@ -390,57 +409,47 @@ class PageOne(tk.Frame):
         
         tk.Label(self, text = 'Monitoring Page', font=("Verdana",14), padx =10, pady =15).grid(row=0,column=3, rowspan =2)
 
-        recordDataLbl = tk.Label(self, text = 'Record data as .csv',font=("Verdana",12))
-        backBtn = tk.Button(self, text = 'Back',  padx =10, pady =5,command=lambda: controller.show_frame(graph_Page))
-        startBtn = tk.Button(self, text = 'START',  padx =10, pady =5,command = lambda: saveDataAsCSV(True))
-        stopBtn = tk.Button(self, text = 'STOP', relief="sunken", padx =10, pady =5,command = lambda: saveDataAsCSV(False))
-        serialLbl = tk.Label(self, text = 'Serial',font=("Verdana",12))
-        portComLbl = tk.Label(self, text = 'COM14', padx =5, pady =5)
-        baudRateLbl = tk.Label(self, text = '115200', padx =5, pady =5)
-        connectionLbl = tk.Label(self, text = 'OPEN', bg='green', padx =10, pady =5)
+        self.recordDataLbl = tk.Label(self, text = 'Record data as .csv',font=("Verdana",12))
+        self.startBtn = tk.Button(self, text = 'START',  padx =10, pady =5,command = self.startBtnClick)
+        self.stopBtn = tk.Button(self, text = 'STOP', background= "red",relief="sunken", padx =10, pady =5,command = self.stopBtnClick)
+##        self.serialLbl = tk.Label(self, text = 'Serial',font=("Verdana",12))
+##        self.portComLbl = tk.Label(self, text = 'COM14', padx =5, pady =5)
+##        self.baudRateLbl = tk.Label(self, text = '115200', padx =5, pady =5)
+##        self.connectionLbl = tk.Label(self, text = 'OPEN', bg='green', padx =10, pady =5)
 
         # création d'un widget 'Canvas' pour l'affichage des graphiques :
 ##        can1 = tk.Canvas(self, width =160, height =160, bg ='white')
 
-        recordDataLbl.grid(row = 0, column = 0, columnspan = 3)
-        serialLbl.grid(row = 0, column = 4, columnspan = 3)
-        backBtn.grid(row = 1, column = 0)
-        startBtn.grid(row = 1, column = 1)
-        stopBtn.grid(row = 1, column =2 )
-        portComLbl.grid(row=1,column=4, sticky='e')
-        baudRateLbl.grid(row=1,column=5)
-        connectionLbl.grid(row=1,column=6)
+        self.recordDataLbl.grid(row = 0, column = 0, columnspan = 3)
+##        self.serialLbl.grid(row = 0, column = 4, columnspan = 3)
+##        backBtn.grid(row = 1, column = 0)
+        self.startBtn.grid(row = 1, column = 1)
+        self.stopBtn.grid(row = 1, column =2 )
+##        self.portComLbl.grid(row=1,column=4, sticky='e')
+##        self.baudRateLbl.grid(row=1,column=5)
+##        self.connectionLbl.grid(row=1,column=6)
 
-##        can1.grid(row =1, column =0, columnspan =7, padx =5, pady =5, sticky='nswe')
-        canvas = FigureCanvasTkAgg(f, self)
-        canvas.draw
+        self.canvas = FigureCanvasTkAgg(f, self)
+        self.canvas.draw
 
-        canvas.get_tk_widget().grid(row =2, column =0)
+        self.canvas.get_tk_widget().grid(row =2, column =0)
 
-##        toolbar = NavigationToolbar2TkAgg(can1, self)
-##        toolbar.update()
-        canvas._tkcanvas.grid(row =2, column =0, columnspan =7, padx =5, pady =5, sticky='nswe')
+        self.toolbar = NavigationToolbar2TkAgg(self.canvas, self)
+        self.toolbar.update()
+        self.canvas._tkcanvas.grid(row =2, column =0, columnspan =7, padx =5, pady =5, sticky='nswe')
 
+    def startBtnClick (self):
+        if arduinoData.isOpen() == True:
+            self.startBtn.configure(background= "green",relief="sunken")
+            self.stopBtn.configure(background= "SystemButtonFace",relief="raised")
+            saveDataAsCSV(True)
+        else:
+            popupmsg('No serial port opened. No data to record!')
 
-
-
-class graph_Page(tk.Frame): # Page of the monitoring graph
-
-    def __init__(self, parent, controller):
-
-        tk.Frame.__init__(self,parent)
-        
-        tk.Label(self, text="Monitoring Page", font= LARGE_FONT).pack(pady=10,padx=10)
-        
-        button1 = ttk.Button(self,
-                            text="Page One",
-                            command=lambda: controller.show_frame(PageOne))
-        button1.pack()
-        
-        button2 = ttk.Button(self,
-                            text="Back to home",
-                            command=lambda: controller.show_frame(StartPage))
-        button2.pack()
+    def stopBtnClick (self):
+        self.startBtn.configure(background= "SystemButtonFace",relief="raised")
+        self.stopBtn.configure(background= "red",relief="sunken")
+        saveDataAsCSV(False)
 
 
 ##        canvas = FigureCanvasTkAgg(f, self)
