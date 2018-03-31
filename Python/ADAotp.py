@@ -1,7 +1,12 @@
 # -*- coding: UTF-8 -*-
+"""
+import <module_name>                        -->     Need to refer to <module_name> inorder to use inclued functions e.g. serial.Serial()
+from <module_name> import <function_name>   -->     The <function_name> can be used directly without reference to its <module_name>
+from <module_name> import *                 -->     All the the functions inclued in the <module_name>
+                                                    can be used used directly without reference to its <module_name>
+"""
 import random # Used for create_plots function (test purpose)
-
-import serial
+import serial # Need to make a refrence to it in order to use one of its function e.g. serial.Serial()
 
 import matplotlib
 matplotlib.use("TkAgg")
@@ -22,6 +27,9 @@ T1_Arr=[]  # Create an empty array for saving temperatures values
 I1_Arr=[]  # Create an empty array for saving current values
 H1_Arr=[]  # Create an empty array for saving Hydrogen values
 P1_Arr=[]  # Create an empty array for saving Hydrogen values
+
+sensorList = [T1_Arr,I1_Arr,H1_Arr,P1_Arr]
+
 
 LARGE_FONT = ("Verdana",12)
 NORM_FONT = ("Verdana",10)
@@ -53,6 +61,8 @@ a = f.add_subplot(221)
 b = f.add_subplot(222)
 c = f.add_subplot(223)
 d = f.add_subplot(224)
+
+subPlotArr = [a,b,c,d]
 
 # --------------------------
 # function for test purposes only
@@ -115,7 +125,7 @@ def chooseBaudRate(): # Allow the user to choose the baud rate of the serial com
         label = ttk.Label(baudRateQ, text = "Specify the baud rate value.")
         label.pack(side="top", fill="x", pady=10)
 
-        e = ttk.Entry(baudRateQ)
+        e = ttk.Entry(baudRateQ)  
         e.insert(0,baudRate)
         e.pack()
         e.focus_set()
@@ -160,7 +170,6 @@ def chooseSampleSize(): # Allow the user to choose the sample size of displayed 
 def openSerialPort(portCom, baudRate, openState): # Should open a serial communication with the portCom and baudRate defined
     global arduinoData
     
-
     if openState == True:
         if arduinoData.isOpen() == False:
             arduinoData.port = portCOM
@@ -168,17 +177,19 @@ def openSerialPort(portCom, baudRate, openState): # Should open a serial communi
 ##            arduinoData.timeout = 1
             try:
                 arduinoData.open()
-                print('Port {} is now opened'.format(arduinoData.port))
             except:
                 popupmsg('Unable to open serial port {}. Please check connection.'.format(arduinoData.port))
+            else:
+                print('Port {} is now opened'.format(arduinoData.port))
                 
     elif openState == False:
         if arduinoData.isOpen() == True:
             try:
                 arduinoData.close()
-                print('Port {} is now closed'.format(arduinoData.port))
             except:
                 popupmsg('Unable to close serial port {}. Please check connection.'.format(arduinoData.port))
+            else:
+                print('Port {} is now closed'.format(arduinoData.port))
         else:
             popupmsg('Serial port {} already closed.'.format(arduinoData.port))
             
@@ -218,8 +229,22 @@ def popupmsg(msg): # Popup the given message "msg"
     B1 = ttk.Button(popup, text="Okay", command = popup.destroy)
     B1.pack()
     popup.mainloop()
-
     
+
+def clearSubPlot(subPlotToClear): # Clear all subplot in 
+    for subPlot in subPlotToClear:
+        subPlot.clear()
+        
+
+def storeSensorData(dataToStore, listToAppend ):    # Store received sensor values <dataToStore> to the list to append <listToAppend>
+    for i in range(len(dataToStore)):
+        listToAppend[i].append(float(dataToStore[i]))
+
+
+def resizeSample(arrayListToResize, sampleSize):
+    while(len(arrayListToResize[0])>sampleSize):     
+        for i in range(len(arrayListToResize)):
+            arrayListToResize[i].pop(0)         # If you have "sampleSize" or more points, delete the first one from the array
     
     
 def animate(i): # This function create graph, read data from serial port and update the graph
@@ -229,21 +254,11 @@ def animate(i): # This function create graph, read data from serial port and upd
             
         arduinoString = arduinoData.readline()  # read the line of text from the serial port
         dataArray = arduinoString.split(',')    # Split it into an array called dataArray
-            
-        T1 = float( dataArray[0])   # Convert 1st element (temperature) to floating number and put in T1
-        I1 = float( dataArray[1])   # Convert 2nd element (Current) to floating number and put in I1
-        H1 = float( dataArray[2])   # Convert 3rd element (hydrogen) to integer number and put in H1
-        P1 = float( dataArray[3])   # Convert 4th element (Pressure) to floating number and put in P1
+
+        storeSensorData(dataArray, sensorList)
         
-        T1_Arr.append(T1)   # Build our T1 array by appending T1 readings
-        I1_Arr.append(I1)   # Building our current array by appending I1 readings
-        H1_Arr.append(H1)   # Building our Hydrogen array by appending H1 readings
-        P1_Arr.append(P1)   # Building our Hydrogen array by appending P1 readings
-        
-        a.clear() # clean the last graph in order to allow the new values to be drawn
-        b.clear()
-        c.clear()
-        d.clear()
+        clearSubPlot(subPlotArr) # clean the last graph in order to allow the new values to be drawn
+
         
         a.plot(T1_Arr, 'ro-', label=u'Temp °C' , linewidth=0.5 , markersize=2)   # plot the temperature data
         a.set_title('Temperature')
@@ -266,15 +281,10 @@ def animate(i): # This function create graph, read data from serial port and upd
         d.set_ylabel ('Pressure (KPa)')
 
         
-        
-        while(len(T1_Arr)>sampleSize):     # If you have "sampleSize" or more points, delete the first one from the array
+        if (len(sensorList[0]) > sampleSize):
+               resizeSample(sensorList, sampleSize)
             
-            T1_Arr.pop(0)       # This allows us to just see the last "sampleSize" data points
-            I1_Arr.pop(0)       # Have to be improved later by selecting the number of points in a menu
-            H1_Arr.pop(0)
-            P1_Arr.pop(0)
 
-        
         if saveData ==True: # --- Saving data as csv file --- (see saveDataAsCSV)
             global saveInitalData
             myFile = open(dataFileName,'ab')
@@ -284,13 +294,12 @@ def animate(i): # This function create graph, read data from serial port and upd
                     theWriter = csv.writer(myFile, dialect='excel')
                     i = 0
                     while  i < len(T1_Arr):
-##                        print(T1_Arr[i],I1_Arr[i],H1_Arr[i],P1_Arr[i])
                         theWriter.writerow([T1_Arr[i],I1_Arr[i],H1_Arr[i],P1_Arr[i]])
                         i += 1
-                finally:
-                    
-                    myFile.close()
                     saveInitalData = True
+                finally:
+                    myFile.close()
+                    
             else:
                 try:
                     theWriter = csv.writer(myFile, dialect='excel')  
@@ -429,13 +438,14 @@ class graph_Page(tk.Frame): # Page of the monitoring graph
 ##        self.baudRateLbl.grid(row=1,column=5)
 ##        self.connectionLbl.grid(row=1,column=6)
 
+##        can1.grid(row =1, column =0, columnspan =7, padx =5, pady =5, sticky='nswe')
         self.canvas = FigureCanvasTkAgg(f, self)
         self.canvas.draw
 
         self.canvas.get_tk_widget().grid(row =2, column =0)
 
-        self.toolbar = NavigationToolbar2TkAgg(self.canvas, self)
-        self.toolbar.update()
+##        toolbar = NavigationToolbar2TkAgg(can1, self)
+##        toolbar.update()
         self.canvas._tkcanvas.grid(row =2, column =0, columnspan =7, padx =5, pady =5, sticky='nswe')
 
     def startBtnClick (self):
